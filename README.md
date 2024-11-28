@@ -2,6 +2,12 @@
  随时唤起记录你在做什么，每天统计总结
  全程 Claude + Windsurf 编写，基于 electron 打包应用。
 
+## 预览
+|---|---|
+|![工作记录](assets/recording.jpg)|![查看记录](assets/recorder.jpg)|
+|---|---|
+|![工作总结](assets/summary.jpg)|![设置](assets/setting.jpg)|
+
 ## 功能特点
   
 - 使用快捷键快速记录工作内容
