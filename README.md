@@ -1,5 +1,6 @@
 # Recorder
  随时唤起记录你在做什么，每天统计总结
+ 全程 Claude + Windsurf 编写，基于 electron 打包应用。
 
 ## 功能特点
   
