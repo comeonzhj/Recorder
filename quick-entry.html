@@ -1,0 +1,55 @@
+<!-- quick-entry.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: rgba(28, 28, 28, 0.95);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            height: 100vh;
+        }
+        #quick-entry {
+            width: 100%;
+            height: 60px;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            padding: 0 20px;
+            outline: none;
+        }
+        #quick-entry::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="quick-entry" placeholder="记录你现在正在做的事情... (按ESC取消)" autofocus>
+    <script>
+        const { ipcRenderer } = require('electron');
+        const input = document.getElementById('quick-entry');
+        
+        // 处理按键事件
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && input.value.trim()) {
+                e.preventDefault(); // 阻止默认的回车行为
+                ipcRenderer.send('log-work', input.value.trim());
+                input.value = '';
+            } else if (e.key === 'Escape') {
+                e.preventDefault(); // 阻止默认的ESC行为
+                ipcRenderer.send('close-quick-entry');
+            }
+        });
+
+        // 点击空白区域关闭
+        document.body.addEventListener('click', (e) => {
+            if (e.target === document.body) {
+                ipcRenderer.send('close-quick-entry');
+            }
+        });
+    </script>
+</body>
+</html>

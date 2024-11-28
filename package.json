@@ -1,0 +1,59 @@
+{
+    "name": "recorder",
+    "version": "1.0.0",
+    "description": "A Mac app for logging daily work activities",
+    "main": "main.js",
+    "scripts": {
+      "start": "electron .",
+      "build": "electron-builder",
+      "build:mac": "electron-builder --mac",
+      "build:win": "electron-builder --win"
+    },
+    "build": {
+      "appId": "com.recorder.app",
+      "productName": "Recorder",
+      "copyright": "Copyright 2024",
+      "directories": {
+        "buildResources": "build"
+      },
+      "mac": {
+        "category": "public.app-category.productivity",
+        "target": ["dmg", "zip"],
+        "darkModeSupport": true,
+        "icon": "build/icons/icon.icns"
+      },
+      "win": {
+        "target": ["nsis", "portable"],
+        "icon": "build/icons/icon.ico"
+      },
+      "dmg": {
+        "icon": "build/icons/icon.icns",
+        "iconSize": 100,
+        "contents": [
+          {
+            "x": 130,
+            "y": 220
+          },
+          {
+            "x": 410,
+            "y": 220,
+            "type": "link",
+            "path": "/Applications"
+          }
+        ]
+      },
+      "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true
+      }
+    },
+    "dependencies": {
+      "electron-store": "^8.1.0"
+    },
+    "devDependencies": {
+      "electron": "^28.1.0",
+      "electron-builder": "^24.9.1"
+    }
+}

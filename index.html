@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            width: 280px;
+            min-width: 280px;
+        }
+        .nav-item {
+            transition: all 0.3s ease;
+        }
+        .nav-item:hover {
+            transform: translateX(4px);
+        }
+        .record-item {
+            transition: all 0.2s ease;
+        }
+        .record-item:hover {
+            transform: scale(1.01);
+        }
+        /* 开关样式 */
+        .toggle-checkbox {
+            transition: all 0.3s;
+            right: 0;
+        }
+        .toggle-checkbox:checked {
+            right: 16px;
+            background-color: #3B82F6;
+            border-color: #3B82F6;
+        }
+        .toggle-label {
+            transition: background-color 0.3s;
+            width: 40px;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #BFDBFE;
+        }
+        #reminder-interval-input::-webkit-inner-spin-button,
+        #reminder-interval-input::-webkit-outer-spin-button {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="flex h-screen">
+        <!-- 侧边栏 -->
+        <div class="sidebar bg-white shadow-lg">
+            <div class="p-6">
+                <h1 class="text-2xl font-bold text-gray-800 mb-6">工作记录</h1>
+                <div class="flex flex-col space-y-2">
+                    <button id="records-btn" class="nav-item px-4 py-3 bg-blue-500 text-white rounded-lg flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        记录
+                    </button>
+                    <button id="summary-btn" class="nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        总结
+                    </button>
+                    <button id="settings-btn" class="nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        设置
+                    </button>
+                </div>
+            </div>
+            <div id="sidebar-content" class="px-6 pb-6 overflow-y-auto">
+                <!-- 动态内容区域 -->
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="flex-1 overflow-y-auto p-8" id="main-content">
+            <!-- 动态内容区域 -->
+        </div>
+    </div>
+    <script>
+        const { ipcRenderer } = require('electron');
+        const Store = require('electron-store');
+        const store = new Store();
+        const WorkSummary = require('./summary.js');
+
+        // 工具函数
+        function formatDate(dateStr) {
+            return new Date(dateStr).toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+
+        function groupLogsByDay(logs) {
+            return logs.reduce((groups, log) => {
+                const date = new Date(log.timestamp).toISOString().split('T')[0];
+                if (!groups[date]) {
+                    groups[date] = [];
+                }
+                groups[date].push(log);
+                return groups;
+            }, {});
+        }
+
+        function getDayLogs(logs, date) {
+            return logs.filter(log => {
+                const logDate = new Date(log.timestamp).toISOString().split('T')[0];
+                return logDate === date;
+            });
+        }
+
+        function getUniqueDates(logs) {
+            return [...new Set(logs.map(log => 
+                new Date(log.timestamp).toISOString().split('T')[0]
+            ))].sort().reverse();
+        }
+
+        // 页面管理
+        const pages = {
+            records: {
+                loadSidebar: () => {
+                    const logs = store.get('logs', []);
+                    const dayGroups = groupLogsByDay(logs);
+                    renderDayGroups(dayGroups);
+                },
+                loadContent: (date) => {
+                    const logs = store.get('logs', []);
+                    const dayLogs = getDayLogs(logs, date);
+                    renderDayLogs(dayLogs);
+                }
+            },
+            summary: {
+                loadSidebar: () => {
+                    const logs = store.get('logs', []);
+                    const dates = getUniqueDates(logs);
+                    renderDateList(dates);
+                },
+                loadContent: (date) => {
+                    const logs = store.get('logs', []);
+                    const summary = new WorkSummary(logs, store.get('endTime', '18:00'));
+                    const currentTime = new Date(); // 获取当前时间作为统计截止时间
+                    const daySummary = summary.generateDailySummary(date, currentTime);
+                    renderSummary(daySummary);
+                }
+            },
+            settings: {
+                loadSidebar: () => {
+                    document.getElementById('sidebar-content').innerHTML = '';
+                },
+                loadContent: () => {
+                    renderSettings();
+                }
+            }
+        };
+
+        // UI 渲染函数
+        function renderDayGroups(groups) {
+            const html = Object.entries(groups)
+                .sort(([a], [b]) => b.localeCompare(a))
+                .map(([date, logs]) => `
+                    <div class="record-item p-4 border-b cursor-pointer hover:bg-gray-100" 
+                        onclick="pages.records.loadContent('${date}')">
+                        <div class="font-medium">${formatDate(date)}</div>
+                        <div class="text-sm text-gray-500">${logs.length} 条记录</div>
+                    </div>
+                `).join('');
+            document.getElementById('sidebar-content').innerHTML = html;
+        }
+
+        function renderDayLogs(logs) {
+            const html = logs
+                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                .map(log => `
+                    <div class="record-item mb-4 p-6 bg-white rounded-lg shadow-sm hover:shadow-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-sm text-gray-500">
+                                ${new Date(log.timestamp).toLocaleTimeString()}
+                            </div>
+                            <span class="px-2 py-1 text-xs rounded-full ${
+                                log.type === 'manual' 
+                                    ? 'bg-blue-100 text-blue-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                            }">
+                                ${log.type === 'manual' ? '手动记录' : '系统记录'}
+                            </span>
+                        </div>
+                        <div class="text-gray-800">
+                            ${log.content}
+                        </div>
+                    </div>
+                `).join('');
+            document.getElementById('main-content').innerHTML = html;
+        }
+
+        function renderDateList(dates) {
+            const html = dates.map(date => `
+                <div class="record-item p-4 border-b cursor-pointer hover:bg-gray-100"
+                    onclick="pages.summary.loadContent('${date}')">
+                    ${formatDate(date)}
+                </div>
+            `).join('');
+            document.getElementById('sidebar-content').innerHTML = html;
+        }
+
+        function renderSummary(summary) {
+            if (!summary) {
+                document.getElementById('main-content').innerHTML = 
+                    '<div class="flex items-center justify-center h-full text-gray-500">该日期没有工作记录</div>';
+                return;
+            }
+
+            const html = `
+                <div class="space-y-6">
+                    <div class="p-8 bg-white rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">今日工作概览</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-6 bg-blue-50 rounded-lg">
+                                <div class="text-sm text-blue-600 mb-2">开始时间</div>
+                                <div class="text-2xl font-semibold text-blue-900">${summary.startTime}</div>
+                            </div>
+                            <div class="p-6 bg-green-50 rounded-lg">
+                                <div class="text-sm text-green-600 mb-2">完成任务</div>
+                                <div class="text-2xl font-semibold text-green-900">${summary.totalTasks} 件</div>
+                            </div>
+                            <div class="p-6 bg-purple-50 rounded-lg">
+                                <div class="text-sm text-purple-600 mb-2">累计工作</div>
+                                <div class="text-2xl font-semibold text-purple-900">
+                                    ${summary.totalDuration.hours}小时 ${summary.totalDuration.minutes}分钟
+                                </div>
+                            </div>
+                            <div class="p-6 bg-orange-50 rounded-lg">
+                                <div class="text-sm text-orange-600 mb-2">最长工作</div>
+                                <div class="text-lg font-medium text-orange-900 truncate" title="${summary.longestWork.content}">
+                                    ${summary.longestWork.content}
+                                </div>
+                                <div class="text-sm text-orange-600 mt-1">
+                                    ${summary.longestWork.duration.hours}小时 ${summary.longestWork.duration.minutes}分钟
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('main-content').innerHTML = html;
+        }
+
+        function renderSettings() {
+            const currentShortcut = store.get('quickEntryShortcut', 'CommandOrControl+Shift+Space');
+            const currentEndTime = store.get('endTime', '18:00');
+            const autoLaunch = store.get('autoLaunch', false);
+            const reminderEnabled = store.get('reminderEnabled', true);
+            const reminderInterval = store.get('reminderInterval', 30);
+
+            const html = `
+                <div class="max-w-2xl mx-auto space-y-6">
+                    <div class="p-8 bg-white rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">应用设置</h2>
+                        <div class="space-y-6">
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    快速录入快捷键
+                                </label>
+                                <input type="text" id="shortcut-input" 
+                                    class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    value="${currentShortcut}"
+                                    placeholder="例如: CommandOrControl+Shift+Space"
+                                    readonly>
+                                <p class="mt-1 text-sm text-gray-500">
+                                    点击输入框并按下新的快捷键组合
+                                </p>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    工作结束时间
+                                </label>
+                                <input type="time" id="end-time-input" 
+                                    class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    value="${currentEndTime}">
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">开机自启</label>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                                        <input type="checkbox" id="auto-launch-toggle" 
+                                            class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                                            ${autoLaunch ? 'checked' : ''}>
+                                        <label for="auto-launch-toggle" 
+                                            class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">工作提醒</label>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                                        <input type="checkbox" id="reminder-toggle" 
+                                            class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                                            ${reminderEnabled ? 'checked' : ''}>
+                                        <label for="reminder-toggle" 
+                                            class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-medium text-gray-700">
+                                        提醒间隔（分钟）
+                                    </label>
+                                    <input type="number" id="reminder-interval-input" 
+                                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        value="${reminderInterval}" min="1" max="120">
+                                </div>
+                            </div>
+
+                            <div class="pt-4">
+                                <button onclick="saveSettings()" 
+                                    class="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                    保存设置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('main-content').innerHTML = html;
+        }
+
+        // 设置保存
+        function saveSettings() {
+            const shortcut = document.getElementById('shortcut-input').value;
+            const endTime = document.getElementById('end-time-input').value;
+            const autoLaunch = document.getElementById('auto-launch-toggle').checked;
+            const reminderEnabled = document.getElementById('reminder-toggle').checked;
+            const reminderInterval = parseInt(document.getElementById('reminder-interval-input').value);
+
+            // 验证提醒间隔
+            if (isNaN(reminderInterval) || reminderInterval < 1 || reminderInterval > 120) {
+                alert('提醒间隔必须在1-120分钟之间');
+                return;
+            }
+
+            // 验证快捷键格式
+            if (!shortcut) {
+                alert('请设置快捷键');
+                return;
+            }
+
+            store.set('quickEntryShortcut', shortcut);
+            store.set('endTime', endTime);
+            store.set('autoLaunch', autoLaunch);
+            store.set('reminderEnabled', reminderEnabled);
+            store.set('reminderInterval', reminderInterval);
+
+            // 通知主进程更新设置
+            ipcRenderer.send('update-shortcut', shortcut);
+            ipcRenderer.send('update-auto-launch', autoLaunch);
+            ipcRenderer.send('update-reminder-interval', reminderInterval);
+            
+            alert('设置已保存');
+        }
+
+        // 监听设置变化
+        function setupSettingsListeners() {
+            const reminderToggle = document.getElementById('reminder-toggle');
+            const reminderIntervalInput = document.getElementById('reminder-interval-input');
+            const shortcutInput = document.getElementById('shortcut-input');
+
+            if (shortcutInput) {
+                shortcutInput.addEventListener('keydown', function(e) {
+                    e.preventDefault();
+                    
+                    const keys = [];
+                    if (e.metaKey) keys.push('Command');
+                    if (e.ctrlKey) keys.push('Control');
+                    if (e.altKey) keys.push('Alt');
+                    if (e.shiftKey) keys.push('Shift');
+                    
+                    // 只添加非修饰键
+                    if (!['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) {
+                        keys.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
+                    }
+                    
+                    if (keys.length > 1) {  // 确保至少有一个修饰键
+                        const shortcut = keys.join('+');
+                        this.value = shortcut;
+                    }
+                });
+            }
+
+            if (reminderToggle && reminderIntervalInput) {
+                reminderToggle.addEventListener('change', function(e) {
+                    reminderIntervalInput.disabled = !e.target.checked;
+                    if (!e.target.checked) {
+                        reminderIntervalInput.classList.add('opacity-50');
+                    } else {
+                        reminderIntervalInput.classList.remove('opacity-50');
+                    }
+                });
+
+                // 初始状态
+                reminderIntervalInput.disabled = !reminderToggle.checked;
+                if (!reminderToggle.checked) {
+                    reminderIntervalInput.classList.add('opacity-50');
+                }
+            }
+        }
+
+        // 页面事件监听器
+        document.getElementById('records-btn').addEventListener('click', () => {
+            document.getElementById('records-btn').className = 'nav-item px-4 py-3 bg-blue-500 text-white rounded-lg flex items-center';
+            document.getElementById('summary-btn').className = 'nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200';
+            document.getElementById('settings-btn').className = 'nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200';
+            pages.records.loadSidebar();
+            pages.records.loadContent(new Date().toISOString().split('T')[0]);
+        });
+
+        document.getElementById('summary-btn').addEventListener('click', () => {
+            document.getElementById('records-btn').className = 'nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200';
+            document.getElementById('summary-btn').className = 'nav-item px-4 py-3 bg-blue-500 text-white rounded-lg flex items-center';
+            document.getElementById('settings-btn').className = 'nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200';
+            pages.summary.loadSidebar();
+            pages.summary.loadContent(new Date().toISOString().split('T')[0]);
+        });
+
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            document.getElementById('records-btn').className = 'nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200';
+            document.getElementById('summary-btn').className = 'nav-item px-4 py-3 bg-gray-100 text-gray-700 rounded-lg flex items-center hover:bg-gray-200';
+            document.getElementById('settings-btn').className = 'nav-item px-4 py-3 bg-blue-500 text-white rounded-lg flex items-center';
+            pages.settings.loadSidebar();
+            pages.settings.loadContent();
+            // 设置页面加载后设置监听器
+            setTimeout(setupSettingsListeners, 100);
+        });
+
+        // 初始化
+        window.onload = () => {
+            // 默认显示记录页面
+            document.getElementById('records-btn').click();
+        };
+    </script>
+</body>
+</html>
