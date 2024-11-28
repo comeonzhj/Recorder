@@ -33,11 +33,11 @@ npm run build:mac
   + 在 main.js 中修改快捷键设置：
     ```javasript
     // 将
-   const shortcut = store.get('quickEntryShortcut', 'CommandOrControl+Shift+Space');
-   // 改为
-   const shortcut = store.get('quickEntryShortcut', process.platform === 'darwin' ? 'Command+Shift+Space' : 'Control+Shift+Space');
-  ```
-  + 运行
+    const shortcut = store.get('quickEntryShortcut', 'CommandOrControl+Shift+Space');
+    // 改为
+    const shortcut = store.get('quickEntryShortcut', process.platform === 'darwin' ? 'Command+Shift+Space' : 'Control+Shift+Space');
+    ```
+  + 运行：
   ```bash
   npm run build:win
   ```
